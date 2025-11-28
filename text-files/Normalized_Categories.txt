@@ -1,0 +1,30 @@
+Normalized Category	Meaning
+spiritual	Bible, prayer, faith notes
+learning	Theory concepts, notes, courses
+coding	Programming practice, bug solving
+fitness	Gym, running, walking, workouts
+reading	Books, novels, articles
+diet	Nutrition, water, food tracking
+career	Job tasks, business planning
+well-being	Mental health, moods, gratitude
+reflection	Self-thoughts, journaling
+entertainment	Movies, games, fun
+finance	Budget, income, spending
+relationships	Family & friends time
+productivity	Planning, task tracking
+
+This set can be extended anytime.
+
+📥 Raw input from Sheets
+   ↓
+🤖 NLP Heading Detection + Category Classification
+   ↓
+📊 Extract insights (Gym count, Bible count, Study count…)
+   ↓
+🗄️ Save structured data in DB
+   ↓
+📈 Weekly & Monthly dashboards generated easily
+   ↓
+🧠 Gemini AI insights (recommendations, mindset, quotes)
+
+

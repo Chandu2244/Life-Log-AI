@@ -1,0 +1,17 @@
+# ---- SENSITIVE CREDENTIALS ----
+*.json
+.env
+
+# ---- PYTHON ENVIRONMENT ----
+venv/
+env/
+
+# ---- PYTHON CACHE ----
+__pycache__/
+*.pyc
+
+# ---- IDE SETTINGS ----
+.vscode/
+
+# ---- MAC OS ----
+.DS_Store

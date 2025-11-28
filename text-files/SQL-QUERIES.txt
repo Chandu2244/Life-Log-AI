@@ -1,0 +1,39 @@
+CREATE TABLE journal_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_date DATE NOT NULL,
+    category_heading TEXT NOT NULL,         -- The exact heading user wrote (e.g., "God's Word")
+    normalized_category TEXT NOT NULL,      -- Mapped category (e.g., "spiritual", "coding", etc.)
+    content TEXT NOT NULL,                  -- Text under that heading
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE category_map (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_heading TEXT UNIQUE NOT NULL,      -- Heading written by user
+    normalized_category TEXT NOT NULL,      -- Standard mapped category
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE weekly_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    week_start DATE NOT NULL,
+    week_end DATE NOT NULL,
+    normalized_category TEXT NOT NULL,      -- e.g., "coding", "spiritual", "learning"
+    count INTEGER NOT NULL DEFAULT 0,       -- How many times the category appeared this week
+    ai_summary TEXT,                        -- Short AI insight for the category this week
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE monthly_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    month TEXT NOT NULL,                    -- e.g., "2025-10"
+    normalized_category TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    growth_from_last_month REAL,            -- +22.5 or -15.0 (% change vs previous month)
+    ai_summary TEXT,                        -- What happened this month
+    ai_recommendations TEXT,                -- Suggestions for next month
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

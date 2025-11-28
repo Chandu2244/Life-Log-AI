@@ -1,0 +1,28 @@
+📌 User writes Journal in Google Sheet
+                ↓
+🔗 Google Sheets API (Python reads new entries)
+                ↓
+🗄️ Data Processing Layer
+      • NLP (spaCy)
+      • Detect headings & habits
+      • Update habit counts
+                ↓
+💾 Database Storage (PostgreSQL / SQLite locally)
+      • Store raw journal entries
+      • Store category mapping
+      • Store weekly metrics
+      • Store monthly metrics
+                ↓
+🧠 AI Insight Engine
+      • Gemini API uses DB metrics + journal text
+      • Generates summaries, recommendations, motivation
+                ↓
+📊 Dashboard Generation Layer
+      • Writes processed metrics + AI insights to:
+         - Weekly Dashboard Sheet
+         - Monthly Dashboard Sheet
+                ↓
+🔁 Auto Scheduler
+      • Weekly batch → refresh weekly sheet + store weekly metrics
+      • Monthly batch → refresh monthly sheet + store monthly metrics
+

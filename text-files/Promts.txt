@@ -1,0 +1,77 @@
+
+const eachSection=document.querySelectorAll('.side-bar-each-feature');
+const mainContent = document.getElementById("dashboardBody");
+
+let currentCSS = null;
+let currentJS = null;
+
+// Function to load a section (can be reused)
+async function loadSection(section) {
+    const htmlPath = section.dataset.html;
+    const cssPath = section.dataset.css;
+    const jsPath = section.dataset.js;
+
+    // Remove existing CSS & JS
+    if (currentCSS) currentCSS.remove();
+    if (currentJS) currentJS.remove();
+
+    // Load HTML
+    const res = await fetch(htmlPath);
+    const html = await res.text();
+    mainContent.innerHTML = html;
+
+    // Load CSS
+    currentCSS = document.createElement('link');
+    currentCSS.rel = 'stylesheet';
+    currentCSS.href = cssPath;
+    document.head.appendChild(currentCSS);
+
+    // Load JS
+    currentJS = document.createElement("script");
+    currentJS.src = jsPath + "?v=" + Date.now();
+    currentJS.onload = () => {
+        if (typeof window.initQuantityModule === "function") window.initQuantityModule();
+        if (typeof window.initCustomerModule === "function") window.initCustomerModule();
+        if (typeof window.initBillingModule === "function") window.initBillingModule();
+    };
+    document.body.appendChild(currentJS);
+}
+
+// Sidebar click listener
+eachSection.forEach(section => {
+    section.addEventListener('click', async () => {
+        eachSection.forEach(s => s.classList.remove("select-item"));
+        section.classList.add("select-item");
+
+        // Save active section
+        localStorage.setItem("activeSection", section.id);
+
+        await loadSection(section);
+    });
+});
+
+
+
+// Restore last active section ONCE, then clear it
+window.addEventListener("DOMContentLoaded", () => {
+  const active = localStorage.getItem("activeSection");
+  if (active) {
+    const section = document.getElementById(active);
+
+    if (section) {
+      section.classList.add("select-item");
+
+      // Load that section, then CLEAR the key so it behaves like first-time next time
+      loadSection(section).finally(() => {
+        localStorage.removeItem("activeSection");
+      });
+    } else {
+      // If ID not found, clean it anyway
+      localStorage.removeItem("activeSection");
+    }
+  }
+});
+
+
+
+

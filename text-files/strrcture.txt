@@ -1,0 +1,43 @@
+DailyLifeAI/
+│
+├── notebooks/                  ← Experiments & testing first
+│     ├── nlp_tests.ipynb
+│     ├── sheets_reader.ipynb
+│     ├── gemini_prompt_tests.ipynb
+│     └── analytics_logic.ipynb
+│
+├── backend/                    ← Final deployable backend code
+│     ├── __init__.py
+│     ├── main.py               ← Backend entry point (or scheduler runner)
+│     ├── nlp_engine.py         ← spaCy + habit detection + heading grouping
+│     ├── ai_insights.py        ← Gemini API descriptions + suggestions
+│     ├── sheets_reader.py      ← Reads/writes Google Sheet
+│     ├── weekly_update.py      ← Weekly dashboard logic
+│     ├── monthly_update.py     ← Monthly dashboard logic
+│     └── config.py             ← Keys, environment variables
+│
+├── db/
+│     ├── db_connect.py         ← PostgreSQL connection logic
+│     ├── create_tables.sql     ← All table schemas
+│     ├── migration_tools/      ← Later: SQLite → PostgreSQL conversion
+│     └── queries.py            ← Insert/update/select helpers
+│
+├── logs/
+│     ├── weekly.log
+│     ├── monthly.log
+│     └── errors.log
+│
+├── scheduler/
+│     ├── weekly_cron.py        ← Auto-run weekly job
+│     ├── monthly_cron.py       ← Auto-run monthly job
+│     └── run_once.py           ← For testing full pipeline manually
+│
+├── utils/
+│     ├── category_map.json     ← Smart mapping memory (grows over time)
+│     ├── config_example.env
+│     └── helpers.py
+│
+├── requirements.txt            ← All Python libraries
+├── README.md                   ← Project documentation
+├── .env                        ← API keys (DO NOT upload to GitHub)
+└── .gitignore                  ← Ignore secrets & cache files
