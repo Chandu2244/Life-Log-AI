@@ -41,7 +41,24 @@ def is_date_line(line: str) -> bool:
     return False
 
 
-# --------- CATEGORY CLASSIFIER (spaCy + WordNet) ---------
+# --------- CATEGORY CLASSIFIER (Rule Based + spaCy + WordNet) ---------
+
+# Manual keyword dictionary to strongly match headings
+CATEGORY_KEYWORDS = {
+    "spiritual": ["god", "bible", "prayer", "faith", "holy", "church", "word"],
+    "learning": ["learn", "study", "lecture", "class"],
+    "coding": ["code", "coding", "javascript", "node", "python", "css", "html", "flexbox"],
+    "fitness": ["gym", "workout", "exercise", "run", "walk", "fitness"],
+    "reading": ["read", "reading", "book", "novel"],
+    "diet": ["diet", "food", "eat", "eating", "meal", "calorie", "protein"],
+    "career": ["job", "career", "office", "work", "resume", "interview"],
+    "wellbeing": ["mental", "feel", "emotion", "health", "mind"],
+    "finance": ["money", "expense", "salary", "payment", "budget"],
+    "relationships": ["friend", "family", "love", "relationship", "people"],
+    "productivity": ["task", "plan", "focus", "note", "todo"],
+    "creativity": ["create", "draw", "design", "creative", "art"],
+    "hobby": ["game", "cricket", "movie", "music", "play", "fun"]
+}
 
 def wordnet_boost(heading_word: str, cat_word: str) -> float:
     syn1 = wn.synsets(heading_word)
@@ -57,18 +74,32 @@ def wordnet_boost(heading_word: str, cat_word: str) -> float:
                 best = sim
     return best
 
+def rule_based_category(text: str) -> str | None:
+    text_lower = text.lower()
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        for word in keywords:
+            if word in text_lower:
+                return category
+    return None
+
 
 def classify_text_to_category(text: str) -> str:
-    """
-    Classifies any short text (heading or sentence)
-    into one of the 13 normalized categories.
-    """
+    """Try rule-based match first, fallback to semantic similarity."""
+    # 1️⃣ Rule-based strongest match
+    category = rule_based_category(text)
+    if category:
+        return category
+
+    # 2️⃣ Fallback: spaCy + WordNet scoring
     doc = nlp(text.lower())
     best_category = "other"
     best_score = 0.0
 
     for category, cat_doc in CATEGORY_DOCS.items():
-        spacy_score = doc.similarity(cat_doc)
+        try:
+            spacy_score = doc.similarity(cat_doc)
+        except:
+            spacy_score = 0.0
 
         wn_scores = [
             wordnet_boost(token.text, category)
@@ -77,13 +108,15 @@ def classify_text_to_category(text: str) -> str:
         ]
         wn_score = max(wn_scores) if wn_scores else 0.0
 
-        final_score = (spacy_score * 0.75) + (wn_score * 0.25)
+        final_score = (spacy_score * 0.7) + (wn_score * 0.3)
 
         if final_score > best_score:
             best_score = final_score
             best_category = category
 
     return best_category
+
+
 
 
 # --------- HEADING DETECTION (Case 1) ---------
