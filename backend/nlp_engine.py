@@ -1,10 +1,3 @@
-from sheets_reader import get_journal_rows
-
-rows = get_journal_rows()
-print(rows)
-
-# backend/nlp_engine.py
-
 import re
 import spacy
 from nltk.corpus import wordnet as wn
