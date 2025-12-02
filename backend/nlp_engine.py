@@ -4,7 +4,7 @@ from nltk.corpus import wordnet as wn
 
 nlp = spacy.load("en_core_web_sm")
 
-# 13 normalized life categories
+# Normalized categories
 NORMALIZED_CATEGORIES = [
     "spiritual", "learning", "coding", "fitness",
     "reading", "diet", "career", "wellbeing",
@@ -12,279 +12,114 @@ NORMALIZED_CATEGORIES = [
     "creativity", "hobby"
 ]
 
-CATEGORY_DOCS = {cat: nlp(cat.lower()) for cat in NORMALIZED_CATEGORIES}
+CATEGORY_KEYWORDS = {
+    "spiritual": ["god", "bible", "prayer", "faith", "holy", "church"],
+    "learning": ["learn", "study", "lecture", "class", "concept"],
+    "coding": ["code", "coding", "javascript", "node", "python", "css", "html", "flexbox", "practice"],
+    "fitness": ["gym", "workout", "exercise", "run", "walk"],
+    "reading": ["read", "reading", "book", "novel"],
+    "diet": ["diet", "food", "eat", "meal", "calorie"],
+    "career": ["job", "career", "office", "interview"],
+    "wellbeing": ["mental", "feeling", "emotion", "health"],
+    "finance": ["money", "expense", "salary", "budget"],
+    "relationships": ["friend", "family", "love", "people"],
+    "productivity": ["task", "plan", "focus", "todo"],
+    "creativity": ["create", "draw", "design", "art"],
+    "hobby": ["game", "movie", "music", "fun"]
+}
+
 
 
 # --------- DATE DETECTION ---------
-
 DATE_PATTERNS = [
-    r"^\d{2}/\d{2}/\d{4}$",   # 06/10/2025
-    r"^\d{2}-\d{2}-\d{4}$",   # 06-10-2025
-    r"^\d{4}-\d{2}-\d{2}$",   # 2025-10-06
-    r"^\d{4}/\d{2}/\d{2}$",   # 2025/10/06
+    r"^\d{2}/\d{2}/\d{4}$",
+    r"^\d{2}-\d{2}-\d{4}$",
+    r"^\d{4}-\d{2}-\d{2}$",
+    r"^\d{4}/\d{2}/\d{2}$",
 ]
 
 def is_date_line(line: str) -> bool:
-    text = line.strip()
-    if not text:
-        return False
-    for pattern in DATE_PATTERNS:
-        if re.match(pattern, text):
-            return True
-    return False
+    return any(re.match(p, line.strip()) for p in DATE_PATTERNS)
 
 
-# --------- CATEGORY CLASSIFIER (Rule Based + spaCy + WordNet) ---------
-
-# Manual keyword dictionary to strongly match headings
-CATEGORY_KEYWORDS = {
-    "spiritual": ["god", "bible", "prayer", "faith", "holy", "church", "word"],
-    "learning": ["learn", "study", "lecture", "class"],
-    "coding": ["code", "coding", "javascript", "node", "python", "css", "html", "flexbox"],
-    "fitness": ["gym", "workout", "exercise", "run", "walk", "fitness"],
-    "reading": ["read", "reading", "book", "novel"],
-    "diet": ["diet", "food", "eat", "eating", "meal", "calorie", "protein"],
-    "career": ["job", "career", "office", "work", "resume", "interview"],
-    "wellbeing": ["mental", "feel", "emotion", "health", "mind"],
-    "finance": ["money", "expense", "salary", "payment", "budget"],
-    "relationships": ["friend", "family", "love", "relationship", "people"],
-    "productivity": ["task", "plan", "focus", "note", "todo"],
-    "creativity": ["create", "draw", "design", "creative", "art"],
-    "hobby": ["game", "cricket", "movie", "music", "play", "fun"]
-}
-
-def wordnet_boost(heading_word: str, cat_word: str) -> float:
-    syn1 = wn.synsets(heading_word)
-    syn2 = wn.synsets(cat_word)
-    if not syn1 or not syn2:
-        return 0.0
-
-    best = 0.0
-    for s1 in syn1:
-        for s2 in syn2:
-            sim = s1.wup_similarity(s2)
-            if sim and sim > best:
-                best = sim
-    return best
-
-def rule_based_category(text: str) -> str | None:
-    text_lower = text.lower()
-    for category, keywords in CATEGORY_KEYWORDS.items():
-        for word in keywords:
-            if word in text_lower:
-                return category
-    return None
-
-
+# --------- CATEGORY DETECTION ---------
 def classify_text_to_category(text: str) -> str:
-    """Try rule-based match first, fallback to semantic similarity."""
-    # 1️⃣ Rule-based strongest match
-    category = rule_based_category(text)
-    if category:
-        return category
+    text_lower = text.lower()
 
-    # 2️⃣ Fallback: spaCy + WordNet scoring
-    doc = nlp(text.lower())
-    best_category = "other"
-    best_score = 0.0
+    # Rule-based first
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        if any(word in text_lower for word in keywords):
+            return category
 
-    for category, cat_doc in CATEGORY_DOCS.items():
-        try:
-            spacy_score = doc.similarity(cat_doc)
-        except:
-            spacy_score = 0.0
-
-        wn_scores = [
-            wordnet_boost(token.text, category)
-            for token in doc
-            if token.is_alpha and not token.is_stop
-        ]
-        wn_score = max(wn_scores) if wn_scores else 0.0
-
-        final_score = (spacy_score * 0.7) + (wn_score * 0.3)
-
-        if final_score > best_score:
-            best_score = final_score
-            best_category = category
-
-    return best_category
+    return "other"  # fallback
 
 
+# --------- JOURNAL PROCESSOR ---------
+def process_journal_lines(raw_rows):
+    journal_date = None
+    valid_sentences = []
 
-
-# --------- HEADING DETECTION (Case 1) ---------
-
-def looks_like_heading(line: str) -> bool:
-    """
-    Heuristic: a heading is short (<=4 words),
-    has no sentence punctuation, and is not empty.
-    """
-    text = line.strip()
-    if not text:
-        return False
-
-    words = text.split()
-    if len(words) == 0 or len(words) > 4:
-        return False
-
-    # If contains sentence punctuation, likely not a heading
-    if any(p in text for p in [".", "!", "?", ",", ":"]):
-        return False
-
-    return True
-
-
-def detect_mode(lines):
-    """
-    Decide if this day is 'heading' mode or 'plain' mode.
-    If we see enough heading-like lines followed by content lines,
-    we treat it as heading mode.
-    """
-    heading_like_count = 0
-    content_after_heading = 0
-
-    for i, line in enumerate(lines):
-        if looks_like_heading(line):
-            heading_like_count += 1
-            # Check if there is some content after this
-            if i + 1 < len(lines) and not looks_like_heading(lines[i + 1]):
-                content_after_heading += 1
-
-    # Simple rule: if there's at least 1–2 clear heading+content patterns,
-    # go with heading mode.
-    if heading_like_count >= 1 and content_after_heading >= 1:
-        return "heading"
-    else:
-        return "plain"
-
-
-# --------- PROCESSOR FOR HEADING + CONTENT CASE ---------
-
-def process_heading_mode(lines, journal_date: str):
-    sections = []
-    current_heading = None
-    current_content = []
-
-    for line in lines:
-        if looks_like_heading(line):
-            # Save previous section if exists
-            if current_heading is not None:
-                sections.append({
-                    "original_heading": current_heading,
-                    "normalized_category": classify_text_to_category(current_heading),
-                    "content_lines": current_content
-                })
-            # Start new section
-            current_heading = line.strip()
-            current_content = []
+    for row in raw_rows:
+        # Merge multiple columns into one text block
+        if isinstance(row, list):
+            text = " ".join(str(c).strip() for c in row if c and str(c).strip())
         else:
-            if current_heading is not None:
-                if line.strip():
-                    current_content.append(line.strip())
+            text = str(row).strip()
 
-    # Save last section
-    if current_heading is not None:
-        sections.append({
-            "original_heading": current_heading,
-            "normalized_category": classify_text_to_category(current_heading),
-            "content_lines": current_content
-        })
-
-    return {
-        "journal_date": journal_date,
-        "mode": "heading",
-        "sections": sections
-    }
-
-
-# --------- PROCESSOR FOR PLAIN CONTENT CASE ---------
-
-def process_plain_mode(lines, journal_date: str):
-    """
-    No explicit headings. We treat each sentence,
-    classify it, and group by category.
-    """
-    category_to_sentences = {}
-
-    for line in lines:
-        text = line.strip()
         if not text:
             continue
 
+        # Detect date
+        if journal_date is None and is_date_line(text):
+            journal_date = text
+            continue
+
+        text_lower = text.lower()
+
+        # Filter out junk
+        if text.isdigit():
+            continue
+        if len(text.split()) <= 2:
+            continue
+
+        # Split into sentences and filter again
         doc = nlp(text)
         for sent in doc.sents:
-            sent_text = sent.text.strip()
-            if not sent_text:
+            s = sent.text.strip()
+            if len(s.split()) <= 2:  # too short after splitting
                 continue
-            cat = classify_text_to_category(sent_text)
-            category_to_sentences.setdefault(cat, []).append(sent_text)
+            if s.isdigit():
+                continue
 
-    sections = []
-    for cat, sents in category_to_sentences.items():
-        sections.append({
-            "original_heading": None,
-            "normalized_category": cat,
-            "content_lines": sents
-        })
+            valid_sentences.append(s)
+
+    if journal_date is None:
+        journal_date = "unknown"
+
+    # Group into categories
+    category_map = {}
+    for sent in valid_sentences:
+        cat = classify_text_to_category(sent)
+        category_map.setdefault(cat, []).append(sent)
+
+    sections = [{"normalized_category": cat, "content_lines": sents}
+                for cat, sents in category_map.items()]
 
     return {
         "journal_date": journal_date,
-        "mode": "plain",
         "sections": sections
     }
 
 
-# --------- MAIN ENTRY FUNCTION ---------
-
-def process_journal_lines(raw_lines):
-    """
-    raw_lines: list of strings for ONE day's journal
-    (e.g., rows from Google Sheet for that date block)
-    Returns: dict with journal_date, mode, and sections.
-    """
-    # 1. Detect journal date (top line that is only a date)
-    journal_date = None
-    content_lines = []
-
-    for i, line in enumerate(raw_lines):
-        if journal_date is None and is_date_line(line):
-            journal_date = line.strip()
-        else:
-            content_lines.append(line)
-
-    if journal_date is None:
-        # Optional: raise error or assume unknown date
-        journal_date = "unknown"
-
-    # 2. Decide mode
-    mode = detect_mode(content_lines)
-
-    # 3. Process accordingly
-    if mode == "heading":
-        return process_heading_mode(content_lines, journal_date)
-    else:
-        return process_plain_mode(content_lines, journal_date)
-
-
-# Quick debug example (run: python nlp_engine.py)
+# Debug
 if __name__ == "__main__":
-    example_lines_heading = [
-        "06/10/2025",
-        "God's Word",
-        "Israel people groaned to God and He heard them.",
-        "Workout",
-        "Gym 1 hour, felt strong."
+    sample = [
+        ["06/10/2025"],
+        ["God's Word", "", "Israel people groaned to God.\nGod listened their cry and remebered\nthe promise he made with Abraham,Issac and Jacob\nand knew it's time to act."],
+        ["Concepts", "CSS Flexbox > Introduction to CSS Flexbox | Part 2 - Flex wrap"],
+        ["Problems", "CSS Flexbox > Coding Practice 2\nCoding pratice 3"],
+        ["Note", "8"]
     ]
 
-    example_lines_plain = [
-        "06/10/2025",
-        "Went to gym for 1 hour and felt energetic.",
-        "Read Bible at night before sleep.",
-        "Studied CSS Flexbox for 30 minutes."
-    ]
-
-    print("HEADING MODE EXAMPLE:")
-    print(process_journal_lines(example_lines_heading))
-
-    print("\nPLAIN MODE EXAMPLE:")
-    print(process_journal_lines(example_lines_plain))
+    from pprint import pprint
+    pprint(process_journal_lines(sample))
