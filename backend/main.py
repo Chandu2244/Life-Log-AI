@@ -1,32 +1,36 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from sheets_reader import get_journal_rows
-from nlp_engine import process_journal_lines
+from nlp_engine import process_journal_lines, is_date_line
 from habit_tracker import count_selected_habits_week
-from nlp_engine import is_date_line  # Already exists in your file
+from db.db_connect import (
+    init_database,
+    insert_raw_day,
+    insert_processed_section,
+    insert_weekly_stats
+)
 
 
-rows=get_journal_rows()
-print(rows)
 
 def group_days_by_date(all_rows):
     grouped = []
     current_day = []
 
     for row in all_rows:
-        # remove empty cells
-        cleaned_cells = [cell.strip() for cell in row if cell and cell.strip()]
+        cleaned_cells = [cell.strip() for cell in row if cell and str(cell).strip()]
 
         if not cleaned_cells:
             continue
 
         first_value = cleaned_cells[0]
 
-        # If first value is a date → new day starts
+        # Detect new day when date appears
         if is_date_line(first_value):
             if current_day:
                 grouped.append(current_day)
-            current_day = [first_value]
+            current_day = cleaned_cells[:]  # include date + content
         else:
-            # Merge ALL meaningful cells into day
             current_day.extend(cleaned_cells)
 
     if current_day:
@@ -35,21 +39,77 @@ def group_days_by_date(all_rows):
     return grouped
 
 
-# ---- MAIN FLOW ----
+# ---------------- MAIN EXECUTION ---------------- #
 
-all_rows = get_journal_rows()  # flat list of ALL rows in Sheet
-day_blocks = group_days_by_date(all_rows)
+print("\n📌 Starting Journal Processing Pipeline...")
 
-print("\nGrouped Days:")
-for d in day_blocks:
-    print(d, "\n")
+# Initialize DB (create tables if not exist)
+init_database()
 
-week_data = []
-for day in day_blocks:
-    processed = process_journal_lines(day)
-    print("\nProcessed:", processed)
-    week_data.append(processed)
+# 1️⃣ Load from Google Sheets
+all_rows = get_journal_rows()
 
-habit_counts = count_selected_habits_week(week_data)
-print("\nWEEKLY HABITS:")
-print(habit_counts)
+# 2️⃣ Group rows by date into days
+grouped_days = group_days_by_date(all_rows)
+print(f"✔ Grouped {len(grouped_days)} days")
+
+# 3️⃣ Process NLP categorization for each day
+processed_days = []
+for day in grouped_days:
+    result = process_journal_lines(day)
+    processed_days.append(result)
+
+print(f"✔ Processed NLP for {len(processed_days)} days")
+
+# 4️⃣ Weekly habit statistics
+weekly_stats = count_selected_habits_week(processed_days)
+print("✔ Weekly Habit Stats Generated")
+
+
+# ---------------- SAVE TO DATABASE ---------------- #
+
+print("\n💾 Saving data into database...")
+
+# Save raw grouped days
+for day in grouped_days:
+    journal_date = day[0]
+    merged_content = day[1:]
+    insert_raw_day(journal_date, merged_content)
+
+print("✔ Raw day data saved")
+
+# Save processed sections (category + content list)
+for day in processed_days:
+    journal_date = day["journal_date"]
+    for section in day["sections"]:
+        insert_processed_section(
+            journal_date,
+            section["normalized_category"],
+            section["content_lines"]
+        )
+
+print("✔ Processed categorized data saved")
+
+# Save weekly stats (skip 0 count categories)
+for (year, week), stats in weekly_stats.items():
+    for category, count in stats.items():
+        if count > 0:  # Only store if user actually did that habit
+            insert_weekly_stats(year, week, category, count)
+
+print("✔ Weekly habit stats saved (only non-zero categories)")
+
+
+
+# ---------------- OUTPUT FOR DEBUG ---------------- #
+
+print("\n📌 FINAL OUTPUT ------")
+print("1️⃣ GROUPED DAYS:")
+print(grouped_days)
+
+print("\n2️⃣ PROCESSED DAYS:")
+print(processed_days)
+
+print("\n3️⃣ WEEKLY HABIT STATS:")
+print(weekly_stats)
+
+print("\n🎯 All data successfully processed and stored in DB!")
